@@ -238,6 +238,43 @@ def train_rnn(
     return model, history
 
 
+# ----------------------------------------------------------------------------
+# Behavioral Metrics
+# ----------------------------------------------------------------------------
+def compute_behavioral_metrics(overlap_curve: np.ndarray, timesteps_presentation: int, dt: float = DT):
+    """
+    Compute behavioral metrics:
+    - Reaction time: time to first reach overlap > 0.7
+    - Retention duration: time overlap stays > 0.6 after presentation ends
+    """
+    presentation_curve = overlap_curve[:timesteps_presentation]
+    retention_curve = overlap_curve[timesteps_presentation:]
+    
+    # Reaction time: first timestep where overlap > 0.7
+    above_threshold = np.where(presentation_curve > RESPONSE_THRESHOLD)[0]
+    if len(above_threshold) > 0:
+        reaction_time = above_threshold[0] * dt
+    else:
+        reaction_time = np.inf  # Never reached threshold
+    
+    # Retention duration: total time overlap > 0.6 after presentation
+    retention_duration = np.sum(retention_curve > RETENTION_THRESHOLD) * dt
+    
+    # Also compute old metrics for comparison
+    reaction_magnitude = presentation_curve.max()
+    retention_magnitude = retention_curve.mean()
+    
+    return {
+        "reaction_time": reaction_time,
+        "retention_duration": retention_duration,
+        "reaction_magnitude": reaction_magnitude,
+        "retention_magnitude": retention_magnitude,
+    }
+
+
+# ----------------------------------------------------------------------------
+# Visualization & Testing
+# ----------------------------------------------------------------------------
 def plot_training_history(history: dict, suffix: str):
     fig, axes = plt.subplots(2, 2, figsize=(14, 8))
 
@@ -318,19 +355,23 @@ def test_model(model: VanillaRNN, suffix: str, fixed_memory: torch.Tensor):
     if n_mem == 1:
         axes = [axes]
 
-    ret_list, react_list = [], []
+    metrics_list = []
     for i in range(n_mem):
         curve = overlaps[i].cpu().numpy()
-        ret = curve[TIMESTEPS_PRESENTATION:].mean()
-        react = curve[:TIMESTEPS_PRESENTATION].max()
-        ret_list.append(ret)
-        react_list.append(react)
+        metrics = compute_behavioral_metrics(curve, TIMESTEPS_PRESENTATION)
+        metrics_list.append(metrics)
 
         axes[i].plot(time, curve, linewidth=2, label=f"Memory {i + 1}")
         axes[i].axvline(x=T_PRESENTATION, color="gray", linestyle="--", label="End of presentation")
-        axes[i].axhline(y=RESPONSE_THRESHOLD, color="r", linestyle="--", alpha=0.5, label="Response threshold")
-        axes[i].axhline(y=RETENTION_THRESHOLD, color="orange", linestyle="--", alpha=0.5, label="Retention threshold")
-        axes[i].set_title(f"Memory {i + 1}: Reaction={react:.3f}, Retention={ret:.3f}", fontweight="bold")
+        axes[i].axhline(y=RESPONSE_THRESHOLD, color="r", linestyle="--", alpha=0.5, label=f"Response threshold ({RESPONSE_THRESHOLD})")
+        axes[i].axhline(y=RETENTION_THRESHOLD, color="orange", linestyle="--", alpha=0.5, label=f"Retention threshold ({RETENTION_THRESHOLD})")
+        
+        # Mark reaction time
+        if metrics["reaction_time"] < np.inf:
+            axes[i].axvline(x=metrics["reaction_time"], color="green", linestyle=":", alpha=0.7, label=f"Reaction time ({metrics['reaction_time']:.3f}s)")
+        
+        title = f"Memory {i + 1}: Reaction {metrics['reaction_time']:.3f}s, Retention {metrics['retention_duration']:.2f}s"
+        axes[i].set_title(title, fontweight="bold")
         axes[i].set_xlabel("Time (s)")
         axes[i].set_ylabel("Overlap")
         axes[i].legend()
@@ -342,11 +383,17 @@ def test_model(model: VanillaRNN, suffix: str, fixed_memory: torch.Tensor):
     print(f"✓ Saved: {fname}")
     plt.close()
 
-    print("Test Results:")
-    for i in range(n_mem):
-        print(f"  Memory {i + 1} - Reaction: {react_list[i]:.3f}, Retention: {ret_list[i]:.3f}")
-    print(f"  Average Reaction: {np.mean(react_list):.3f}")
-    print(f"  Average Retention: {np.mean(ret_list):.3f}")
+    print("Test Results (Behavioral Metrics):")
+    for i, m in enumerate(metrics_list):
+        print(f"  Memory {i + 1}:")
+        print(f"    Reaction time: {m['reaction_time']:.3f}s (magnitude: {m['reaction_magnitude']:.3f})")
+        print(f"    Retention duration: {m['retention_duration']:.2f}s (avg magnitude: {m['retention_magnitude']:.3f})")
+    
+    avg_reaction_time = np.mean([m['reaction_time'] for m in metrics_list if m['reaction_time'] < np.inf])
+    avg_retention_duration = np.mean([m['retention_duration'] for m in metrics_list])
+    print(f"\n  Averages:")
+    print(f"    Reaction time: {avg_reaction_time:.3f}s")
+    print(f"    Retention duration: {avg_retention_duration:.2f}s")
 
 
 def test_model_with_noise(model: VanillaRNN, suffix: str, fixed_memory: torch.Tensor, noise_std: float = 0.1):
@@ -387,19 +434,22 @@ def test_model_with_noise(model: VanillaRNN, suffix: str, fixed_memory: torch.Te
     if n_mem == 1:
         axes = [axes]
 
-    ret_list, react_list = [], []
+    metrics_list = []
     for i in range(n_mem):
         curve = overlaps[i].cpu().numpy()
-        ret = curve[TIMESTEPS_PRESENTATION:].mean()
-        react = curve[:TIMESTEPS_PRESENTATION].max()
-        ret_list.append(ret)
-        react_list.append(react)
+        metrics = compute_behavioral_metrics(curve, TIMESTEPS_PRESENTATION)
+        metrics_list.append(metrics)
 
-        axes[i].plot(time, curve, linewidth=2, label=f"Memory {i + 1} (converged from noisy input)")
+        axes[i].plot(time, curve, linewidth=2, label=f"Memory {i + 1} (from noisy input)")
         axes[i].axvline(x=T_PRESENTATION, color="gray", linestyle="--", label="End of presentation")
-        axes[i].axhline(y=RESPONSE_THRESHOLD, color="r", linestyle="--", alpha=0.5, label="Response threshold")
-        axes[i].axhline(y=RETENTION_THRESHOLD, color="orange", linestyle="--", alpha=0.5, label="Retention threshold")
-        axes[i].set_title(f"Memory {i + 1}: Reaction={react:.3f}, Retention={ret:.3f}", fontweight="bold")
+        axes[i].axhline(y=RESPONSE_THRESHOLD, color="r", linestyle="--", alpha=0.5, label=f"Response threshold ({RESPONSE_THRESHOLD})")
+        axes[i].axhline(y=RETENTION_THRESHOLD, color="orange", linestyle="--", alpha=0.5, label=f"Retention threshold ({RETENTION_THRESHOLD})")
+        
+        if metrics["reaction_time"] < np.inf:
+            axes[i].axvline(x=metrics["reaction_time"], color="green", linestyle=":", alpha=0.7, label=f"Reaction time ({metrics['reaction_time']:.3f}s)")
+        
+        title = f"Memory {i + 1}: Reaction {metrics['reaction_time']:.3f}s, Retention {metrics['retention_duration']:.2f}s"
+        axes[i].set_title(title, fontweight="bold")
         axes[i].set_xlabel("Time (s)")
         axes[i].set_ylabel("Overlap (with clean pattern)")
         axes[i].legend()
@@ -411,11 +461,18 @@ def test_model_with_noise(model: VanillaRNN, suffix: str, fixed_memory: torch.Te
     print(f"✓ Saved: {fname}")
     plt.close()
 
-    print(f"Test Results (input corrupted by noise_std={noise_std}):")
-    for i in range(n_mem):
-        print(f"  Memory {i + 1} - Reaction: {react_list[i]:.3f}, Retention: {ret_list[i]:.3f}")
-    print(f"  Average Reaction: {np.mean(react_list):.3f}")
-    print(f"  Average Retention: {np.mean(ret_list):.3f}")
+    print(f"Test Results (Noisy Input, std={noise_std}):")
+    for i, m in enumerate(metrics_list):
+        print(f"  Memory {i + 1}:")
+        print(f"    Reaction time: {m['reaction_time']:.3f}s (magnitude: {m['reaction_magnitude']:.3f})")
+        print(f"    Retention duration: {m['retention_duration']:.2f}s (avg magnitude: {m['retention_magnitude']:.3f})")
+    
+    avg_reaction_time = np.mean([m['reaction_time'] for m in metrics_list if m['reaction_time'] < np.inf])
+    avg_retention_duration = np.mean([m['retention_duration'] for m in metrics_list])
+    print(f"\n  Averages:")
+    print(f"    Reaction time: {avg_reaction_time:.3f}s")
+    print(f"    Retention duration: {avg_retention_duration:.2f}s")
+
 
 
 def test_model_with_bit_flip(model: VanillaRNN, suffix: str, fixed_memory: torch.Tensor, flip_rate: float = 0.1):
@@ -451,19 +508,22 @@ def test_model_with_bit_flip(model: VanillaRNN, suffix: str, fixed_memory: torch
     if n_mem == 1:
         axes = [axes]
 
-    ret_list, react_list = [], []
+    metrics_list = []
     for i in range(n_mem):
         curve = overlaps[i].cpu().numpy()
-        ret = curve[TIMESTEPS_PRESENTATION:].mean()
-        react = curve[:TIMESTEPS_PRESENTATION].max()
-        ret_list.append(ret)
-        react_list.append(react)
+        metrics = compute_behavioral_metrics(curve, TIMESTEPS_PRESENTATION)
+        metrics_list.append(metrics)
 
-        axes[i].plot(time, curve, linewidth=2, label=f"Memory {i + 1}")
+        axes[i].plot(time, curve, linewidth=2, label=f"Memory {i + 1} (from bit-flipped input)")
         axes[i].axvline(x=T_PRESENTATION, color="gray", linestyle="--", label="End of presentation")
-        axes[i].axhline(y=RESPONSE_THRESHOLD, color="r", linestyle="--", alpha=0.5, label="Response threshold")
-        axes[i].axhline(y=RETENTION_THRESHOLD, color="orange", linestyle="--", alpha=0.5, label="Retention threshold")
-        axes[i].set_title(f"Memory {i + 1}: Reaction={react:.3f}, Retention={ret:.3f}", fontweight="bold")
+        axes[i].axhline(y=RESPONSE_THRESHOLD, color="r", linestyle="--", alpha=0.5, label=f"Response threshold ({RESPONSE_THRESHOLD})")
+        axes[i].axhline(y=RETENTION_THRESHOLD, color="orange", linestyle="--", alpha=0.5, label=f"Retention threshold ({RETENTION_THRESHOLD})")
+        
+        if metrics["reaction_time"] < np.inf:
+            axes[i].axvline(x=metrics["reaction_time"], color="green", linestyle=":", alpha=0.7, label=f"Reaction time ({metrics['reaction_time']:.3f}s)")
+        
+        title = f"Memory {i + 1}: Reaction {metrics['reaction_time']:.3f}s, Retention {metrics['retention_duration']:.2f}s"
+        axes[i].set_title(title, fontweight="bold")
         axes[i].set_xlabel("Time (s)")
         axes[i].set_ylabel("Overlap (with clean pattern)")
         axes[i].legend()
@@ -475,11 +535,18 @@ def test_model_with_bit_flip(model: VanillaRNN, suffix: str, fixed_memory: torch
     print(f"✓ Saved: {fname}")
     plt.close()
 
-    print(f"Test Results (input corrupted by bit flips, rate={flip_rate}):")
-    for i in range(n_mem):
-        print(f"  Memory {i + 1} - Reaction: {react_list[i]:.3f}, Retention: {ret_list[i]:.3f}")
-    print(f"  Average Reaction: {np.mean(react_list):.3f}")
-    print(f"  Average Retention: {np.mean(ret_list):.3f}")
+    print(f"Test Results (Bit Flips, rate={flip_rate}):")
+    for i, m in enumerate(metrics_list):
+        print(f"  Memory {i + 1}:")
+        print(f"    Reaction time: {m['reaction_time']:.3f}s (magnitude: {m['reaction_magnitude']:.3f})")
+        print(f"    Retention duration: {m['retention_duration']:.2f}s (avg magnitude: {m['retention_magnitude']:.3f})")
+    
+    avg_reaction_time = np.mean([m['reaction_time'] for m in metrics_list if m['reaction_time'] < np.inf])
+    avg_retention_duration = np.mean([m['retention_duration'] for m in metrics_list])
+    print(f"\n  Averages:")
+    print(f"    Reaction time: {avg_reaction_time:.3f}s")
+    print(f"    Retention duration: {avg_retention_duration:.2f}s")
+
 
 
 
