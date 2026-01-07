@@ -1,0 +1,6 @@
+trial,segment,memory,input_mode,noise_mode,noise_std,base_overlap,gain_mem_0
+0,0,0,deterministic,constant,0.0,2.5,2.5
+1,0,0,deterministic,constant,0.0,2.5,2.5
+2,0,0,deterministic,constant,0.0,2.5,2.5
+3,0,0,deterministic,constant,0.0,2.5,2.5
+4,0,0,deterministic,constant,0.0,2.5,2.5

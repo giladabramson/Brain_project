@@ -1,0 +1,14 @@
+{
+  "w_s": 0.7333333333333331,
+  "w_external": 1.8166666666666669,
+  "noise_levels": [
+    0.5
+  ],
+  "stim_duration": 2.0,
+  "segment_count": 1,
+  "segment_duration": 10,
+  "dt": 0.01,
+  "stim_sequence": [
+    0
+  ]
+}

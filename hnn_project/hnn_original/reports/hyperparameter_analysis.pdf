@@ -1,0 +1,175 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+2 0 obj
+<< /Length 3011 >>
+stream
+BT
+/F1 12 Tf
+1 0 0 1 72 720 Tm (HOPFIELD NETWORK HYPERPARAMETER STUDY \(PLAIN-LANGUAGE NOTES\)) Tj
+1 0 0 1 72 678 Tm (WHAT WE WANT TO KNOW) Tj
+1 0 0 1 72 650 Tm (- How the code boosts or shrinks the strength of the outside input \(`w_external`\).) Tj
+1 0 0 1 72 636 Tm (*Outside input = the “push” coming from stimuli.*) Tj
+1 0 0 1 72 622 Tm (- How the code boosts or shrinks the internal feedback \(`w_s`\).) Tj
+1 0 0 1 72 608 Tm (*Internal feedback = neurons reinforcing each other to stay in a memory.*) Tj
+1 0 0 1 72 594 Tm (- Where random noise enters the maths.) Tj
+1 0 0 1 72 580 Tm (*Noise = random wiggles that can shake the system into a new state.*) Tj
+1 0 0 1 72 566 Tm (- Where we could plug in controls for these three knobs and later add scoring.) Tj
+1 0 0 1 72 538 Tm (Line numbers below refer to the files in this repository snapshot.) Tj
+1 0 0 1 72 510 Tm (WHERE THE IMPORTANT PIECES LIVE) Tj
+1 0 0 1 72 468 Tm (MEMORY GENERATOR \(`HNN_GEN`\)) Tj
+1 0 0 1 72 440 Tm (`HNN_Gen.HNN` \(`HNN_Gen.py:12-37`\) builds the stored patterns \(“memories”\) and sets the) Tj
+1 0 0 1 72 426 Tm (initial neuron activity. The network size is `self.N = 2**6` \(64 neurons\). The number of) Tj
+1 0 0 1 72 412 Tm (memories is `self.P = 10`. `self.eps` sets the size of the random kick around each stored) Tj
+1 0 0 1 72 398 Tm (memory. Building the Hebbian matrix \(`mems @ memsᵀ`\) sets the baseline internal feedback.) Tj
+1 0 0 1 72 370 Tm (STOCHASTIC INTEGRATOR \(`EUL_MAY.EM`\)) Tj
+1 0 0 1 72 342 Tm (`EM.Eu_Ma_Test` \(`Eul_May.py:37-81`\) steps the activity forward in time using the) Tj
+1 0 0 1 72 328 Tm (Euler–Maruyama method.) Tj
+1 0 0 1 72 314 Tm (*Euler–Maruyama = a recipe for simulating noisy differential equations.*) Tj
+1 0 0 1 72 300 Tm (Each step combines:) Tj
+1 0 0 1 72 286 Tm (- Recurrent drive `np.dot\(W, z\)` where `z = tanh\(delta * y\)` \(`Eul_May.py:87-107`\).) Tj
+1 0 0 1 72 272 Tm (*`tanh` squashes values between –1 and 1 so the neurons saturate gently.*) Tj
+1 0 0 1 72 258 Tm (- Leak `-y`, which pulls neurons back toward zero.) Tj
+1 0 0 1 72 244 Tm (- External input `u`, included when we pick additive mode \(`C == 'A'`\).) Tj
+1 0 0 1 72 230 Tm (- Noise term `sigma * random`, where `sigma` controls the noise strength.) Tj
+1 0 0 1 72 202 Tm (Noise enters through the Wiener increment \(`Eul_May.py:79`\).) Tj
+1 0 0 1 72 188 Tm (*Wiener increment = the small random jump that models Brownian motion.*) Tj
+1 0 0 1 72 160 Tm (EXPERIMENT DRIVER \(`MAINHNN_SHB`\)) Tj
+1 0 0 1 72 132 Tm (`MainHNN_SHB` \(`MainHNN_SHB.py:40-125`\) sets time span, generates memories, and builds the) Tj
+1 0 0 1 72 118 Tm (external input.) Tj
+1 0 0 1 72 104 Tm (`u_proto` \(`MainHNN_SHB.py:62-84`\) contains amplitudes for each memory and each stimulus) Tj
+1 0 0 1 72 90 Tm (slot. The diagonal entries \(2.0–3.5\) push the intended memory; small off-diagonal terms) Tj
+1 0 0 1 72 76 Tm (\(0.05–0.2\) create gentle cross-talk. Combining `u_proto` with the memory patterns yields) Tj
+ET
+endstream
+endobj
+3 0 obj
+<< /Type /Page /Parent 10 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R >> >> /Contents 2 0 R >>
+endobj
+4 0 obj
+<< /Length 2544 >>
+stream
+BT
+/F1 12 Tf
+1 0 0 1 72 720 Tm (`u_tran`, the actual input sent to the integrator. The list `sigma = [0.5]` sets noise) Tj
+1 0 0 1 72 706 Tm (levels for repeats.) Tj
+1 0 0 1 72 678 Tm (AUTAPSE TOY MODEL \(`PARETO/FIGURES/FIG_MODEL.PY`\)) Tj
+1 0 0 1 72 650 Tm (This self-feedback toy system introduces clear knobs `w_in` \(external weight\) and `w_self`) Tj
+1 0 0 1 72 636 Tm (\(internal weight\) \(`pareto/figures/fig_model.py:33-68`\).) Tj
+1 0 0 1 72 622 Tm (*Autapse = a neuron that talks to itself, used here as a simple test bed.*) Tj
+1 0 0 1 72 608 Tm (The update rule:) Tj
+1 0 0 1 72 566 Tm ([CODE BLOCK]) Tj
+1 0 0 1 72 538 Tm (x ← x + dt * \(-x - leak + w_in * h + w_self * activation\(x\)\) + √dt * sigma_n * random) Tj
+1 0 0 1 72 510 Tm ([CODE BLOCK]) Tj
+1 0 0 1 72 468 Tm (It then sweeps these knobs to show a trade-off: stronger input speeds up responses but can) Tj
+1 0 0 1 72 454 Tm (shorten memory \(`pareto/figures/fig_model.py:183-369`\).) Tj
+1 0 0 1 72 426 Tm (HOW THE THREE KNOBS APPEAR) Tj
+1 0 0 1 72 384 Tm (EXTERNAL INPUT STRENGTH \(`W_EXTERNAL`\)) Tj
+1 0 0 1 72 356 Tm (- Right now the strength lives inside `u_proto` \(`MainHNN_SHB.py:62-84`\). There is no) Tj
+1 0 0 1 72 342 Tm (single scalar knob; each stimulus draw sets its own value.) Tj
+1 0 0 1 72 328 Tm (- `EM.hop_field_test` adds the vector `u` directly \(`Eul_May.py:107`\). To mirror Dan’s) Tj
+1 0 0 1 72 314 Tm (`w_external`, we can wrap it as `w_external * u`.) Tj
+1 0 0 1 72 300 Tm (- The autapse model already exposes `w_in` \(`pareto/figures/fig_model.py:33-46`\), and) Tj
+1 0 0 1 72 286 Tm (later plots assume the total input weight is `w_self + w_in`.) Tj
+1 0 0 1 72 258 Tm (**Takeaway:** add a global multiplier, either when computing `u_tran` or inside) Tj
+1 0 0 1 72 244 Tm (`hop_field_test`, so experiments can scale outside input with one parameter.) Tj
+1 0 0 1 72 216 Tm (INTERNAL COUPLING STRENGTH \(`W_S`\)) Tj
+1 0 0 1 72 188 Tm (- The recurrent drive comes from the Hebbian matrix `W = \(1/N\) * M ⊙ \(mems @ memsᵀ\)`) Tj
+1 0 0 1 72 174 Tm (\(`Eul_May.py:104-105`\).) Tj
+1 0 0 1 72 160 Tm (*Hebbian = neurons that fire together wire together; this matrix encodes that rule.*) Tj
+1 0 0 1 72 146 Tm (- A new knob `w_s` could multiply `np.dot\(W, z\)` to deepen or flatten the attractor) Tj
+1 0 0 1 72 132 Tm (wells.) Tj
+1 0 0 1 72 118 Tm (*Attractor well = a stable state the system tends to fall into.*) Tj
+1 0 0 1 72 104 Tm (- In the autapse toy, `w_self` already plays this role.) Tj
+1 0 0 1 72 76 Tm (NOISE LEVEL \(`SIGMA`\)) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Page /Parent 10 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R >> >> /Contents 4 0 R >>
+endobj
+6 0 obj
+<< /Length 3090 >>
+stream
+BT
+/F1 12 Tf
+1 0 0 1 72 706 Tm (- `sigma` passes through every call to `Eu_Ma_Test` and multiplies the random part of) Tj
+1 0 0 1 72 692 Tm (the step \(`Eul_May.py:79`\).) Tj
+1 0 0 1 72 678 Tm (- Adjusting the `sigma` list in `MainHNN_SHB` lets you run several noise settings back) Tj
+1 0 0 1 72 664 Tm (to back.) Tj
+1 0 0 1 72 636 Tm (HOW THESE KNOBS INTERACT) Tj
+1 0 0 1 72 594 Tm (1. **External input vs. stability:** Larger diagonal entries in `u_proto` make the network) Tj
+1 0 0 1 72 580 Tm (snap faster to the target memory, but can overpower the internal matrix if cross-talk is) Tj
+1 0 0 1 72 566 Tm (too big. The autapse sweeps show the same story: higher `w_in` raises responsiveness but) Tj
+1 0 0 1 72 552 Tm (shrinks memory duration \(`pareto/figures/fig_model.py:183-260`\).) Tj
+1 0 0 1 72 538 Tm (2. **Internal gain vs. flexibility:** A bigger `w_s` would make attractor wells deeper,) Tj
+1 0 0 1 72 524 Tm (giving longer recall but slower switching. Autapse plots confirm that higher `w_self`) Tj
+1 0 0 1 72 510 Tm (stretches memory but slows response \(`pareto/figures/fig_model.py:307-365`\).) Tj
+1 0 0 1 72 496 Tm (3. **Noise vs. control:** `sigma` helps the system leave a memory when the input changes,) Tj
+1 0 0 1 72 482 Tm (but too much noise destroys stored patterns. Sweeping `sigma` will highlight where the) Tj
+1 0 0 1 72 468 Tm (model shifts from “stuck” to “chaotic”.) Tj
+1 0 0 1 72 440 Tm (PRACTICAL SUGGESTIONS) Tj
+1 0 0 1 72 398 Tm (1. Add explicit knobs `w_external` and `w_s` in `EM.hop_field_test` so every experiment) Tj
+1 0 0 1 72 384 Tm (can tune them without changing random seeds or inputs.) Tj
+1 0 0 1 72 370 Tm (2. When building `u_proto`, multiply by the global `w_external` so different runs stay) Tj
+1 0 0 1 72 356 Tm (comparable.) Tj
+1 0 0 1 72 342 Tm (3. Borrow the simple metrics from the autapse scripts \(response rate, memory length,) Tj
+1 0 0 1 72 328 Tm (reaction time\) and apply them to the overlap traces produced in `HNPlot`.) Tj
+1 0 0 1 72 300 Tm (LINK TO THE SCIENCE ADVANCES PAPER) Tj
+1 0 0 1 72 258 Tm (The repository follows *Stimulus-Driven Dynamics for Robust Memory Retrieval in Hopfield) Tj
+1 0 0 1 72 244 Tm (Networks* \(Science Advances, doi:10.1126/sciadv.adu6991\). The paper discusses balancing) Tj
+1 0 0 1 72 230 Tm (quick stimulus-driven retrieval against stable memory storage. Our code reflects that) Tj
+1 0 0 1 72 216 Tm (balance: stimuli \(`MainHNN_SHB.py:62-125`\) drive switching, recurrent connections and) Tj
+1 0 0 1 72 202 Tm (noise \(`Eul_May.py:79-107`\) control how long memories stick. Putting the `w_external`,) Tj
+1 0 0 1 72 188 Tm (`w_s`, and `sigma` knobs on the surface will let us explore the same trade-off in a) Tj
+1 0 0 1 72 174 Tm (controlled way.) Tj
+1 0 0 1 72 146 Tm (NEXT STEPS) Tj
+1 0 0 1 72 118 Tm (- Wire in the new scaling knobs and expose them through configuration so sweeps are) Tj
+1 0 0 1 72 104 Tm (simple.) Tj
+1 0 0 1 72 90 Tm (- Reuse the autapse scoring logic to measure responsiveness and memory retention) Tj
+1 0 0 1 72 76 Tm (directly on the Hopfield outputs.) Tj
+ET
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 10 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R >> >> /Contents 6 0 R >>
+endobj
+8 0 obj
+<< /Length 199 >>
+stream
+BT
+/F1 12 Tf
+1 0 0 1 72 720 Tm (- Run structured sweeps \(for example, a grid over `w_external` and `w_s`\) and log) Tj
+1 0 0 1 72 706 Tm (results into the time-stamped folders in `outputs/`.) Tj
+ET
+endstream
+endobj
+9 0 obj
+<< /Type /Page /Parent 10 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R >> >> /Contents 8 0 R >>
+endobj
+10 0 obj
+<< /Type /Pages /Kids [3 0 R 5 0 R 7 0 R 9 0 R] /Count 4 >>
+endobj
+11 0 obj
+<< /Type /Catalog /Pages 10 0 R >>
+endobj
+xref
+0 12
+0000000000 65535 f 
+0000000009 00000 n 
+0000000079 00000 n 
+0000003141 00000 n 
+0000003268 00000 n 
+0000005863 00000 n 
+0000005990 00000 n 
+0000009131 00000 n 
+0000009258 00000 n 
+0000009507 00000 n 
+0000009634 00000 n 
+0000009710 00000 n 
+trailer
+<< /Size 12 /Root 11 0 R >>
+startxref
+9761
+%%EOF
