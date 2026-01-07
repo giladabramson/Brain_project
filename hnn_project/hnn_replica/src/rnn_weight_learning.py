@@ -361,6 +361,20 @@ def test_model_with_noise(model: VanillaRNN, suffix: str, fixed_memory: torch.Te
     noisy_memories = fixed_memory + torch.randn_like(fixed_memory) * noise_std
     noisy_memories = torch.clamp(noisy_memories, -1.0, 1.0)  # Keep in valid range
     
+    # Diagnostic: measure actual noise corruption
+    noise_applied = noisy_memories - fixed_memory
+    corruption_l2 = torch.norm(noise_applied, p=2, dim=1).mean().item()
+    avg_per_neuron = torch.abs(noise_applied).mean().item()
+    print(f"Noise Statistics (with clamping):")
+    print(f"  L2 norm per pattern: {corruption_l2:.4f}")
+    print(f"  Mean absolute corruption per neuron: {avg_per_neuron:.4f}")
+    print(f"  Requested std: {noise_std:.4f}")
+    
+    # Measure initial overlap (noisy patterns vs clean patterns)
+    initial_overlap = torch.sum(noisy_memories * fixed_memory, dim=1) / fixed_memory.shape[1]
+    print(f"  Initial overlap (noisy vs clean): {initial_overlap.mean().item():.4f}")
+    print()
+    
     input_seq = generate_input_sequence(noisy_memories, TIMESTEPS_PRESENTATION, TIMESTEPS_TOTAL)
     
     with torch.no_grad():
@@ -402,6 +416,71 @@ def test_model_with_noise(model: VanillaRNN, suffix: str, fixed_memory: torch.Te
         print(f"  Memory {i + 1} - Reaction: {react_list[i]:.3f}, Retention: {ret_list[i]:.3f}")
     print(f"  Average Reaction: {np.mean(react_list):.3f}")
     print(f"  Average Retention: {np.mean(ret_list):.3f}")
+
+
+def test_model_with_bit_flip(model: VanillaRNN, suffix: str, fixed_memory: torch.Tensor, flip_rate: float = 0.1):
+    """Test with actual bit flips (more realistic corruption)."""
+    print("\n" + "=" * 80)
+    print(f"TESTING TRAINED MODEL WITH BIT FLIP (flip_rate={flip_rate})")
+    print("=" * 80 + "\n")
+
+    n_mem = fixed_memory.shape[0]
+    
+    # Create bit-flipped version (actually flip bits, not add noise)
+    flipped_memories = fixed_memory.clone()
+    for i in range(n_mem):
+        flip_mask = torch.rand(fixed_memory.shape[1]) < flip_rate
+        flipped_memories[i, flip_mask] *= -1.0  # Flip these bits
+    
+    # Diagnostic
+    bit_diff = (flipped_memories != fixed_memory).float().mean().item()
+    initial_overlap = torch.sum(flipped_memories * fixed_memory, dim=1) / fixed_memory.shape[1]
+    print(f"Bit Flip Statistics:")
+    print(f"  Fraction flipped: {bit_diff:.4f} (expected {flip_rate:.4f})")
+    print(f"  Initial overlap (flipped vs clean): {initial_overlap.mean().item():.4f}")
+    print()
+    
+    input_seq = generate_input_sequence(flipped_memories, TIMESTEPS_PRESENTATION, TIMESTEPS_TOTAL)
+    
+    with torch.no_grad():
+        states = model(input_seq)
+        overlaps = compute_overlap(states, fixed_memory)
+
+    time = np.arange(TIMESTEPS_TOTAL) * DT
+    fig, axes = plt.subplots(n_mem, 1, figsize=(12, 5 * n_mem))
+    if n_mem == 1:
+        axes = [axes]
+
+    ret_list, react_list = [], []
+    for i in range(n_mem):
+        curve = overlaps[i].cpu().numpy()
+        ret = curve[TIMESTEPS_PRESENTATION:].mean()
+        react = curve[:TIMESTEPS_PRESENTATION].max()
+        ret_list.append(ret)
+        react_list.append(react)
+
+        axes[i].plot(time, curve, linewidth=2, label=f"Memory {i + 1}")
+        axes[i].axvline(x=T_PRESENTATION, color="gray", linestyle="--", label="End of presentation")
+        axes[i].axhline(y=RESPONSE_THRESHOLD, color="r", linestyle="--", alpha=0.5, label="Response threshold")
+        axes[i].axhline(y=RETENTION_THRESHOLD, color="orange", linestyle="--", alpha=0.5, label="Retention threshold")
+        axes[i].set_title(f"Memory {i + 1}: Reaction={react:.3f}, Retention={ret:.3f}", fontweight="bold")
+        axes[i].set_xlabel("Time (s)")
+        axes[i].set_ylabel("Overlap (with clean pattern)")
+        axes[i].legend()
+        axes[i].grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    fname = EXPERIMENT_DIR / f"test_trajectory_bitflip_{suffix}.png"
+    plt.savefig(fname, dpi=150, bbox_inches="tight")
+    print(f"✓ Saved: {fname}")
+    plt.close()
+
+    print(f"Test Results (input corrupted by bit flips, rate={flip_rate}):")
+    for i in range(n_mem):
+        print(f"  Memory {i + 1} - Reaction: {react_list[i]:.3f}, Retention: {ret_list[i]:.3f}")
+    print(f"  Average Reaction: {np.mean(react_list):.3f}")
+    print(f"  Average Retention: {np.mean(ret_list):.3f}")
+
 
 
 def run_tanh_two_memory():
@@ -475,9 +554,12 @@ def run_tanh_five_memory_with_noise(noise_std: float = 0.1):
     print("\n>>> Testing with clean patterns...")
     test_model(model, "option_a_tanh_5mem_noise", fixed_memory)
     
-    print(f"\n>>> Testing with noisy patterns (noise_std={noise_std})...")
+    print(f"\n>>> Testing with noisy patterns (Gaussian noise_std={noise_std})...")
     test_model_with_noise(model, "option_a_tanh_5mem_noise", fixed_memory, noise_std=noise_std)
+    
+    print(f"\n>>> Testing with bit flips (flip_rate=0.1)...")
+    test_model_with_bit_flip(model, "option_a_tanh_5mem_noise", fixed_memory, flip_rate=0.1)
 
 
 if __name__ == "__main__":
-    run_tanh_five_memory_with_noise(noise_std=0.1)
+    run_tanh_five_memory_with_noise(noise_std=0.5)
