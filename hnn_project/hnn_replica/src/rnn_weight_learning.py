@@ -161,9 +161,14 @@ def train_rnn(loss_option: str = "a", n_epochs: int = N_EPOCHS, lr: float = LEAR
 
     if fixed_memory is None:
         fixed_memory = generate_memory_patterns(BATCH_SIZE, N_NEURONS)
-    print(f"Memory 1 (first 10): {fixed_memory[0, :10].tolist()}")
-    if fixed_memory.shape[0] > 1:
-        print(f"Memory 2 (first 10): {fixed_memory[1, :10].tolist()}\n")
+    
+    n_memories = fixed_memory.shape[0]
+    for i in range(min(n_memories, 5)):  # Show first 5 memories
+        print(f"Memory {i+1} (first 10): {fixed_memory[i, :10].tolist()}")
+    if n_memories > 5:
+        print(f"... and {n_memories - 5} more memories\n")
+    else:
+        print()
 
     history = {
         "total_loss": [],
@@ -331,5 +336,18 @@ def run_tanh_two_memory():
     test_model(model, "option_a_tanh", fixed_memory)
 
 
+def run_tanh_five_memory():
+    print("\n" + "=" * 80)
+    print("RNN WEIGHT LEARNING EXPERIMENT (tanh, 5 memories)")
+    print("=" * 80)
+
+    fixed_memory = generate_memory_patterns(5, N_NEURONS)  # 5 memory patterns
+    print("\n>>> Training...")
+    model, history = train_rnn(loss_option="a", fixed_memory=fixed_memory, activation="tanh")
+    plot_training_history(history, "option_a_tanh_5mem")
+    visualize_learned_weights(model, "option_a_tanh_5mem")
+    test_model(model, "option_a_tanh_5mem", fixed_memory)
+
+
 if __name__ == "__main__":
-    run_tanh_two_memory()
+    run_tanh_five_memory()
