@@ -143,7 +143,16 @@ def compute_fixed_point_loss(model: VanillaRNN, memory_patterns: torch.Tensor, g
 # ----------------------------------------------------------------------------
 # Training & evaluation
 # ----------------------------------------------------------------------------
-def train_rnn(loss_option: str = "a", n_epochs: int = N_EPOCHS, lr: float = LEARNING_RATE, fixed_memory: torch.Tensor | None = None, activation: str = "tanh"):
+def train_rnn(
+    loss_option: str = "a",
+    n_epochs: int = N_EPOCHS,
+    lr: float = LEARNING_RATE,
+    fixed_memory: torch.Tensor | None = None,
+    activation: str = "tanh",
+    target_retention: float = 0.99,
+    target_reaction: float = 0.99,
+    patience: int = 20,
+):
     print("\n" + "=" * 80)
     print(f"TRAINING RNN WITH LOSS OPTION {loss_option.upper()} - ACTIVATION: {activation.upper()}")
     print("=" * 80 + "\n")
@@ -151,7 +160,8 @@ def train_rnn(loss_option: str = "a", n_epochs: int = N_EPOCHS, lr: float = LEAR
     print(f"Activation: {activation}")
     print(f"Total time: {T_TOTAL}s ({TIMESTEPS_TOTAL} steps)")
     print(f"Presentation: {T_PRESENTATION}s ({TIMESTEPS_PRESENTATION} steps)")
-    print(f"Training mode: alternating single memory across {BATCH_SIZE} patterns")
+    n_memories = fixed_memory.shape[0] if fixed_memory is not None else BATCH_SIZE
+    print(f"Training mode: alternating over {n_memories} memories (one per epoch) with batch=1")
     print(f"Loss weights: alpha={ALPHA_RETENTION}, beta={BETA_REACTION}")
     print(f"L2 regularization: lambda={L2_LAMBDA}\n")
 
@@ -161,7 +171,7 @@ def train_rnn(loss_option: str = "a", n_epochs: int = N_EPOCHS, lr: float = LEAR
 
     if fixed_memory is None:
         fixed_memory = generate_memory_patterns(BATCH_SIZE, N_NEURONS)
-    
+
     n_memories = fixed_memory.shape[0]
     for i in range(min(n_memories, 5)):  # Show first 5 memories
         print(f"Memory {i+1} (first 10): {fixed_memory[i, :10].tolist()}")
@@ -177,6 +187,9 @@ def train_rnn(loss_option: str = "a", n_epochs: int = N_EPOCHS, lr: float = LEAR
         "avg_retention": [],
         "avg_reaction": [],
     }
+
+    converged_epoch: int | None = None
+    streak = 0
 
     for epoch in range(n_epochs):
         optimizer.zero_grad()
@@ -203,11 +216,24 @@ def train_rnn(loss_option: str = "a", n_epochs: int = N_EPOCHS, lr: float = LEAR
         history["avg_retention"].append(metrics["avg_retention_overlap"])
         history["avg_reaction"].append(metrics["avg_max_presentation_overlap"])
 
+        if metrics["avg_retention_overlap"] >= target_retention and metrics["avg_max_presentation_overlap"] >= target_reaction:
+            streak += 1
+            if streak >= patience:
+                converged_epoch = epoch + 1
+                print(f"Converged at epoch {converged_epoch} (patience {patience}, targets R={target_retention}, Q={target_reaction})")
+                break
+        else:
+            streak = 0
+
         if (epoch + 1) % 100 == 0 or epoch == 0:
             print(f"Epoch {epoch + 1:5d}/{n_epochs} | Loss: {total_loss.item():.4f} | Retention: {history['avg_retention'][-1]:.3f} | Reaction: {history['avg_reaction'][-1]:.3f}")
 
     print("\n" + "=" * 80)
     print("TRAINING COMPLETE")
+    if converged_epoch is not None:
+        print(f"Early stop: met strict convergence at epoch {converged_epoch}")
+    else:
+        print("Early stop: not reached; ran full schedule")
     print("=" * 80 + "\n")
     return model, history
 
@@ -349,5 +375,28 @@ def run_tanh_five_memory():
     test_model(model, "option_a_tanh_5mem", fixed_memory)
 
 
+def run_tanh_memory_sweep(memory_counts: list[int] | None = None):
+    if memory_counts is None:
+        memory_counts = [5, 10, 15, 20]
+
+    for count in memory_counts:
+        print("\n" + "#" * 80)
+        print(f"RUN {count} MEMORIES")
+        print("#" * 80)
+        fixed_memory = generate_memory_patterns(count, N_NEURONS)
+        suffix = f"option_a_tanh_{count}mem"
+        model, history = train_rnn(
+            loss_option="a",
+            fixed_memory=fixed_memory,
+            activation="tanh",
+            target_retention=0.99,
+            target_reaction=0.99,
+            patience=20,
+        )
+        plot_training_history(history, suffix)
+        visualize_learned_weights(model, suffix)
+        test_model(model, suffix, fixed_memory)
+
+
 if __name__ == "__main__":
-    run_tanh_five_memory()
+    run_tanh_memory_sweep()
